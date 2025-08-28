@@ -1,5 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Send, Plus, Menu, User, Sparkles, Copy, ThumbsUp, ThumbsDown, RotateCcw, Share, Mic, Image, Paperclip, Settings, Moon, Sun } from 'lucide-react';
+import {
+  Send, Plus, Menu, User, Sparkles, Copy, ThumbsUp, ThumbsDown,
+  RotateCcw, Share, Mic, Image, Paperclip, Settings, Moon, Sun
+} from 'lucide-react';
+
+// Hardcoded API endpoint URLs for the mock backend
+// In a real application, these would be managed in environment variables
+const API_ENDPOINTS = {
+  history: '/webchat/history/user123?limit=100',
+  send: '/webchat/send',
+};
 
 const GeminiClone = () => {
   const [messages, setMessages] = useState([]);
@@ -7,16 +17,22 @@ const GeminiClone = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [currentConversation, setCurrentConversation] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // Memoized conversations to prevent unnecessary re-renders
+  // Hardcoded user details for API integration
+  // In a real app, these would come from an authentication service
+  const userId = 'user123';
+  const userName = 'React User';
+
+  // Memoized conversations to prevent unnecessary re-renders.
+  // This is now just a placeholder since we are loading history from the API.
+  // const conversations = useMemo(() => [], []);
   const conversations = useMemo(() => [
-    { id: 1, title: 'React Best Practices', preview: 'How to optimize React performance...', timestamp: '2 hours ago', messages: 12 },
-    { id: 2, title: 'AI Ethics & Future', preview: 'Discussing ethical implications of AI...', timestamp: '1 day ago', messages: 8 },
-    { id: 3, title: 'Japan Travel Guide', preview: 'Planning a 2-week trip to Tokyo...', timestamp: '3 days ago', messages: 15 },
-    { id: 4, title: 'Machine Learning Basics', preview: 'Introduction to neural networks...', timestamp: '1 week ago', messages: 6 }
+    { id: 1, title: 'React Best Practices', preview: 'How to optimize React performance...' },
+    { id: 2, title: 'AI Ethics & Future', preview: 'Discussing ethical implications of AI...' },
+    { id: 3, title: 'Japan Travel Guide', preview: 'Planning a 2-week trip to Tokyo...' },
+    { id: 4, title: 'Machine Learning Basics', preview: 'Introduction to neural networks...' }
   ], []);
 
   // Optimized scroll to bottom with requestAnimationFrame
@@ -30,43 +46,48 @@ const GeminiClone = () => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Enhanced AI response system with more context awareness
-  const simulateAIResponse = useCallback((userMessage) => {
-    const responses = {
-      greetings: {
-        patterns: ['hello', 'hi', 'hey', 'good morning', 'good afternoon'],
-        response: "Hello! I'm Gemini, your AI assistant. I'm here to help you with anything from coding and analysis to creative writing and problem-solving. What would you like to explore today?"
-      },
-      react: {
-        patterns: ['react', 'jsx', 'component', 'hook'],
-        response: "React is a powerful JavaScript library for building user interfaces. It features a component-based architecture, virtual DOM for performance, and hooks for state management. Key concepts include JSX syntax, props, state, and the component lifecycle. Would you like me to explain any specific React concept in detail?"
-      },
-      ai: {
-        patterns: ['artificial intelligence', 'ai', 'machine learning', 'neural network'],
-        response: "Artificial Intelligence encompasses various technologies that enable machines to simulate human intelligence. This includes machine learning (algorithms that learn from data), natural language processing (understanding human language), computer vision (interpreting visual information), and deep learning (neural networks with multiple layers). AI is transforming industries from healthcare to finance."
-      },
-      coding: {
-        patterns: ['code', 'programming', 'javascript', 'python', 'algorithm'],
-        response: "I'd be happy to help with coding! I can assist with various programming languages, debugging, code optimization, algorithm design, and best practices. What specific programming challenge are you working on?"
-      },
-      creative: {
-        patterns: ['write', 'story', 'creative', 'poem', 'article'],
-        response: "I love helping with creative projects! I can assist with storytelling, poetry, articles, scripts, and various forms of creative writing. I can help with brainstorming, structure, style, and refinement. What kind of creative project are you working on?"
+  /**
+   * Fetches the initial chat history from the API when the component mounts.
+   * It formats the fetched data to fit the application's message state.
+   */
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        // Fetch chat history from the provided mock endpoint
+        const response = await fetch(API_ENDPOINTS.history);
+        if (!response.ok) {
+          throw new Error('Failed to fetch chat history');
+        }
+        const data = await response.json();
+
+        // Format the fetched history to match the app's message state structure
+        const formattedMessages = data.history.map((item, index) => ({
+          id: `${item.role}-${index}-${Date.now()}`,
+          text: item.content,
+          sender: item.role === 'user' ? 'user' : 'ai',
+          timestamp: new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: 'received',
+        }));
+
+        // Update the messages state with the formatted history
+        setMessages(formattedMessages);
+      } catch (error) {
+        console.error("Error loading chat history:", error);
+        // Optionally, add an error message to the chat
+        setMessages([{
+          id: `error-${Date.now()}`,
+          text: "Failed to load chat history. Please try refreshing the page.",
+          sender: 'ai',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: 'error'
+        }]);
       }
     };
 
-    const lowerMessage = userMessage.toLowerCase();
+    fetchHistory();
+  }, []); // Empty dependency array ensures this effect runs only once on mount
 
-    for (const [category, data] of Object.entries(responses)) {
-      if (data.patterns.some(pattern => lowerMessage.includes(pattern))) {
-        return data.response;
-      }
-    }
-
-    return "That's a fascinating question! I'm designed to help with a wide range of topics including programming, analysis, creative writing, math, science, and general problem-solving. I can break down complex topics, help with research, assist with coding, or engage in creative projects. What specific area would you like to dive into?";
-  }, []);
-
-  // Optimized message sending with better state management
+  // Enhanced message sending with API integration
   const handleSendMessage = useCallback(async () => {
     if (!inputValue.trim()) return;
 
@@ -88,22 +109,49 @@ const GeminiClone = () => {
       textareaRef.current.style.height = 'auto';
     }
 
-    // Simulate realistic AI response time based on message length
-    const responseDelay = Math.min(Math.max(currentInput.length * 20, 800), 3000);
+    try {
+      const response = await fetch(API_ENDPOINTS.send, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          message: currentInput,
+          name: userName,
+        }),
+      });
 
-    setTimeout(() => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+      const aiResponseText = data.reply || "Sorry, I couldn't get a response from the AI.";
+
       const aiResponse = {
         id: `ai-${Date.now()}`,
-        text: simulateAIResponse(currentInput),
+        text: aiResponseText,
         sender: 'ai',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         status: 'received'
       };
 
       setMessages(prev => [...prev, aiResponse]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage = {
+        id: `error-${Date.now()}`,
+        text: "Sorry, something went wrong. Please try again later.",
+        sender: 'ai',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: 'error'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, responseDelay);
-  }, [inputValue, simulateAIResponse]);
+    }
+  }, [inputValue]);
 
   // Enhanced keyboard handling
   const handleKeyPress = useCallback((e) => {
@@ -125,17 +173,12 @@ const GeminiClone = () => {
 
   const startNewChat = useCallback(() => {
     setMessages([]);
-    setCurrentConversation(null);
     setSidebarOpen(false);
   }, []);
 
   const copyMessage = useCallback(async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      // Could add toast notification here
-    } catch (err) {
-      console.error('Failed to copy text');
-    }
+    // In a real app, this would use a more robust copy method
+    document.execCommand('copy');
   }, []);
 
   const toggleDarkMode = useCallback(() => {
@@ -158,7 +201,6 @@ const GeminiClone = () => {
             />
           ))}
         </div>
-        <span className="text-sm font-medium">Gemini is thinking...</span>
       </div>
     </div>
   ));
@@ -201,7 +243,7 @@ const GeminiClone = () => {
       category: "Learning",
       title: "Explain quantum computing",
       subtitle: "in simple, easy-to-understand terms",
-      icon: "🧠",
+      icon: "💡",
       gradient: "from-blue-500 to-cyan-500"
     },
     {
@@ -232,18 +274,18 @@ const GeminiClone = () => {
     <div className={`flex h-screen transition-colors duration-300 ${themeClasses}`}>
       {/* Enhanced Sidebar */}
       <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        fixed inset-y-0 left-0 z-50
-        w-64 sm:w-64 md:w-60 lg:w-1/6
-        ${sidebarClasses} border-r
-        transition-transform duration-300 ease-in-out
-        lg:translate-x-0 lg:static lg:inset-0`}
+                fixed inset-y-0 left-0 z-50
+                w-64 sm:w-64 md:w-60 lg:w-1/6
+                ${sidebarClasses} border-r
+                transition-transform duration-300 ease-in-out
+                lg:translate-x-0 lg:static lg:inset-0`}
       >
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
           <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
             <button
               onClick={startNewChat}
-              className={`w-full flex items-center justify-center space-x-3 border rounded-xl py-3 px-4 transition-all duration-200 hover:scale-[1.02] ${darkMode
+              className={`w-full flex items-center justify-center space-x-3 border rounded-xl hover:cursor-pointer py-3 px-4 transition-all duration-200 hover:scale-[1.02] ${darkMode
                 ? 'bg-gray-700 border-gray-600 hover:bg-gray-600 text-white'
                 : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-900'
                 }`}
@@ -259,7 +301,7 @@ const GeminiClone = () => {
               <h3 className={`text-sm font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 Recent Conversations
               </h3>
-              <button className={`p-1 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}>
+              <button className={`p-1 hover:cursor-pointer rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}>
                 <Settings className="w-4 h-4" />
               </button>
             </div>
@@ -268,19 +310,14 @@ const GeminiClone = () => {
               {conversations.map((conv) => (
                 <div
                   key={conv.id}
-                  className={`group flex items-center justify-between w-full p-3 rounded-lg cursor-pointer transition-colors duration-200 ${currentConversation === conv.id
-                    ? darkMode
-                      ? 'bg-gray-700'
-                      : 'bg-blue-50'
-                    : darkMode
-                      ? 'hover:bg-gray-700'
-                      : 'hover:bg-gray-100'
+                  className={`group flex items-center justify-between w-full px-3 py-2 rounded-lg cursor-pointer transition-colors duration-200 ${darkMode
+                    ? 'hover:bg-gray-700'
+                    : 'hover:bg-gray-100'
                     }`}
-                  onClick={() => setCurrentConversation(conv.id)}
                 >
                   {/* Conversation Name */}
                   <span
-                    className={`flex-1 truncate ${darkMode ? 'text-gray-100' : 'text-gray-900'
+                    className={`flex-1 text-sm truncate ${darkMode ? 'text-gray-100' : 'text-gray-900'
                       }`}
                   >
                     {conv.title}
@@ -290,7 +327,6 @@ const GeminiClone = () => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation(); // prevent opening the conversation
-                      console.log(`Menu for ${conv.id}`);
                     }}
                     className={`p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
                       }`}
@@ -322,7 +358,7 @@ const GeminiClone = () => {
           <div className="flex items-center space-x-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className={`lg:hidden p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              className={`lg:hidden p-2 hover:cursor-pointer rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
                 }`}
             >
               <Menu className="w-5 h-5" />
@@ -337,7 +373,7 @@ const GeminiClone = () => {
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  Gemini
+                  Satya Ai
                 </h1>
                 <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   AI Assistant
@@ -349,15 +385,15 @@ const GeminiClone = () => {
           <div className="flex items-center space-x-2">
             <button
               onClick={toggleDarkMode}
-              className={`p-2 rounded-lg transition-all duration-200 hover:scale-105 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              className={`p-2 hover:cursor-pointer rounded-lg transition-all duration-200 hover:scale-105 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
                 }`}
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            <button className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>
+            <button className={`p-2 hover:cursor-pointer rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}>
               <Share className="w-5 h-5" />
             </button>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+            <div className={`w-8 h-8 hover:cursor-pointer rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
               <User className="w-4 h-4" />
             </div>
           </div>
@@ -375,7 +411,7 @@ const GeminiClone = () => {
               </div>
 
               <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                Hello, I'm Gemini
+                Hello, I'm Satya Ai
               </h2>
               <p className={`text-center max-w-2xl mb-12 text-lg leading-relaxed ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 Your intelligent AI assistant ready to help with anything from complex analysis and coding to creative writing and problem-solving. What would you like to explore today?
@@ -424,7 +460,7 @@ const GeminiClone = () => {
                       )}
 
                       <div className={`flex-1 ${message.sender === 'user' ? 'order-first' : ''}`}>
-                        <div className={`p-4 rounded-2xl transition-all duration-200 ${message.sender === 'user'
+                        <div className={`p-3 rounded-2xl transition-all duration-200 ${message.sender === 'user'
                           ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white ml-auto max-w-2xl shadow-lg'
                           : darkMode
                             ? 'bg-gray-800 text-gray-100 border border-gray-700'
@@ -458,7 +494,7 @@ const GeminiClone = () => {
         </div>
 
         {/* Enhanced Input Area */}
-        <div className={`p-4 sm:p-6 ${darkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'}`}>
+        <div className={`p-3 sm:p-6 ${darkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-white'}`}>
           <div className="max-w-4xl mx-auto">
             <div className="relative flex flex-wrap items-end gap-3">
               {/* Textarea + Icons */}
@@ -468,8 +504,8 @@ const GeminiClone = () => {
                   value={inputValue}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
-                  placeholder="Message Gemini..."
-                  className={`w-full resize-none rounded-2xl px-4 sm:px-6 py-3 sm:py-4 pr-14 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ${darkMode
+                  placeholder="Message Satya Ai..."
+                  className={`w-full resize-none rounded-2xl p-4 sm:px-6 sm:py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 ${darkMode
                     ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400 focus:bg-gray-750'
                     : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 focus:bg-white'
                     } border`}
@@ -486,7 +522,7 @@ const GeminiClone = () => {
                   ].map(({ icon: Icon, label }, index) => (
                     <button
                       key={index}
-                      className={`p-1.5 sm:p-2 rounded-lg transition-all duration-200 hover:scale-110 ${darkMode
+                      className={`p-1.5 sm:p-2 hover:cursor-pointer rounded-lg transition-all duration-200 hover:scale-110 ${darkMode
                         ? 'hover:bg-gray-700 text-gray-400'
                         : 'hover:bg-gray-200 text-gray-500'
                         }`}
@@ -502,7 +538,7 @@ const GeminiClone = () => {
               <button
                 onClick={handleSendMessage}
                 disabled={!inputValue.trim()}
-                className="p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl hover:from-blue-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 shadow-lg disabled:shadow-none"
+                className="p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl hover:from-blue-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 shadow-lg disabled:shadow-none hover:cursor-pointer"
                 style={{ marginBottom: "7px" }}
               >
                 <Send className="w-5 h-5" />
