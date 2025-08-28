@@ -1,5 +1,5 @@
 [[redirects]]
-  from = "/webchati*"
+  from = "/webchat*"
   to = "http://147.93.105.175:9090/:splat"
   status = 200
   force = true
